@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from . import crud, schemas
-from .config import ANTHROPIC_API_KEY, CATEGORIES, DEFAULT_CURRENCY, MAX_IMAGE_BYTES
+from .config import CATEGORIES, DEFAULT_CURRENCY, MAX_IMAGE_BYTES, scanner_enabled
 from .database import Base, engine, get_db
 from .receipt_scanner import ScannerError, scan_receipt
 
@@ -27,7 +27,7 @@ def get_config():
     return {
         "default_currency": DEFAULT_CURRENCY,
         "categories": CATEGORIES,
-        "scanner_enabled": bool(ANTHROPIC_API_KEY),
+        "scanner_enabled": scanner_enabled(),
     }
 
 
