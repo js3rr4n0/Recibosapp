@@ -51,7 +51,7 @@ class ReceiptOut(BaseModel):
     total: float
     currency: str
     category: str
-    image_path: str | None
+    has_image: bool
     created_at: datetime
     items: list[ReceiptItemOut] = []
 

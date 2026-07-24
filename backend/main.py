@@ -1,23 +1,23 @@
 """Aplicación FastAPI: define la API y sirve la interfaz web."""
-import uuid
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from . import crud, models, schemas
-from .config import ANTHROPIC_API_KEY, CATEGORIES, DEFAULT_CURRENCY, UPLOADS_DIR
+from . import crud, schemas
+from .config import ANTHROPIC_API_KEY, CATEGORIES, DEFAULT_CURRENCY, MAX_IMAGE_BYTES
 from .database import Base, engine, get_db
 from .receipt_scanner import ScannerError, scan_receipt
 
 # Crea las tablas en la base de datos si aún no existen.
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Recibosapp — Asistente económico", version="1.0.0")
+app = FastAPI(title="Recibosapp — Asistente económico", version="1.1.0")
 
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+# El frontend estático vive en /public (lo sirve Vercel en producción y este
+# servidor en desarrollo local).
+PUBLIC_DIR = Path(__file__).resolve().parent.parent / "public"
 
 
 # ---------- Configuración / estado ----------
@@ -58,21 +58,23 @@ async def scan_and_store_receipt(
     image_bytes = await file.read()
     if not image_bytes:
         raise HTTPException(status_code=400, detail="El archivo está vacío.")
-
-    # Guardamos la imagen original en disco.
-    suffix = Path(file.filename or "receipt.jpg").suffix or ".jpg"
-    stored_name = f"{uuid.uuid4().hex}{suffix}"
-    stored_path = UPLOADS_DIR / stored_name
-    stored_path.write_bytes(image_bytes)
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="La imagen es demasiado grande. Prueba con una foto de menor resolución.",
+        )
 
     try:
-        scan = scan_receipt(image_bytes, file.filename or stored_name, file.content_type)
+        scan = scan_receipt(image_bytes, file.filename or "receipt.jpg", file.content_type)
     except ScannerError as exc:
-        # Si falla el escaneo, borramos la imagen para no dejar basura.
-        stored_path.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    receipt = crud.create_receipt_from_scan(db, scan, image_path=stored_name)
+    receipt = crud.create_receipt_from_scan(
+        db,
+        scan,
+        image_data=image_bytes,
+        image_mime=file.content_type or "image/jpeg",
+    )
     return receipt
 
 
@@ -92,12 +94,12 @@ def get_receipt(receipt_id: int, db: Session = Depends(get_db)):
 @app.get("/api/receipts/{receipt_id}/image")
 def get_receipt_image(receipt_id: int, db: Session = Depends(get_db)):
     receipt = crud.get_receipt(db, receipt_id)
-    if not receipt or not receipt.image_path:
+    if not receipt or not receipt.image_data:
         raise HTTPException(status_code=404, detail="Imagen no encontrada")
-    path = UPLOADS_DIR / receipt.image_path
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Imagen no encontrada")
-    return FileResponse(path)
+    return Response(
+        content=receipt.image_data,
+        media_type=receipt.image_mime or "image/jpeg",
+    )
 
 
 # ---------- Objetivos de ahorro ----------
@@ -128,6 +130,7 @@ def summary(db: Session = Depends(get_db)):
 
 
 # ---------- Interfaz web (frontend estático) ----------
-# Debe montarse al final para no eclipsar las rutas /api.
-if FRONTEND_DIR.exists():
-    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+# En Vercel el frontend lo sirve la CDN desde /public; este montaje se usa
+# sobre todo en desarrollo local. Debe ir al final para no eclipsar /api.
+if PUBLIC_DIR.exists():
+    app.mount("/", StaticFiles(directory=PUBLIC_DIR, html=True), name="frontend")

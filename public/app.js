@@ -197,17 +197,51 @@ async function deleteTransaction(id) {
 }
 
 // ====== Escaneo de recibos ======
+// Reduce el tamaño de la foto en el navegador antes de subirla. Así evitamos
+// el límite de ~4.5 MB de las funciones serverless de Vercel y ahorramos datos.
+function compressImage(file, maxSize = 1600, quality = 0.8) {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith("image/")) return resolve(file);
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxSize || height > maxSize) {
+        const scale = maxSize / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => resolve(blob && blob.size < file.size ? blob : file),
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file); // Si algo falla, subimos el original.
+    };
+    img.src = url;
+  });
+}
+
 async function onScanReceipt(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+  const original = e.target.files[0];
+  if (!original) return;
 
   const status = $("#scan-status");
   status.className = "scan-status loading";
   status.classList.remove("hidden");
   status.textContent = "🔍 Analizando el recibo… esto puede tardar unos segundos.";
 
+  const file = await compressImage(original);
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append("file", file, "receipt.jpg");
 
   try {
     const res = await fetch("/api/receipts/scan", { method: "POST", body: formData });
@@ -252,7 +286,7 @@ async function openReceipt(id) {
       </p>
       <div class="receipt-items">${itemsHtml}</div>
       <div class="receipt-total"><span>Total</span><span>${fmt(r.total, r.currency)}</span></div>
-      ${r.image_path ? `<img class="receipt-img" src="/api/receipts/${r.id}/image" alt="Recibo" />` : ""}
+      ${r.has_image ? `<img class="receipt-img" src="/api/receipts/${r.id}/image" alt="Recibo" />` : ""}
     `;
     $("#receipt-modal").classList.remove("hidden");
   } catch (err) {

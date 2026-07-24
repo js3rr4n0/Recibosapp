@@ -7,6 +7,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
 )
@@ -52,13 +53,21 @@ class Receipt(Base):
     total: Mapped[float] = mapped_column(Float, default=0.0)
     currency: Mapped[str] = mapped_column(String(8), default="EUR")
     category: Mapped[str] = mapped_column(String(64), default="Otros")
-    image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # La imagen se guarda dentro de la base de datos (el sistema de archivos
+    # de Vercel es de solo lectura). Puede ser null si no se conserva.
+    image_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    image_mime: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     items: Mapped[list["ReceiptItem"]] = relationship(
         back_populates="receipt", cascade="all, delete-orphan"
     )
     transaction: Mapped["Transaction"] = relationship(back_populates="receipt")
+
+    @property
+    def has_image(self) -> bool:
+        """Indica si el recibo tiene una imagen guardada."""
+        return self.image_data is not None
 
 
 class ReceiptItem(Base):

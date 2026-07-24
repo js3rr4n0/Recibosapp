@@ -15,6 +15,9 @@ uploads/
 # Variables de entorno
 .env
 
+# Vercel
+.vercel
+
 # Sistema
 .DS_Store
 *.log

@@ -46,7 +46,10 @@ def delete_transaction(db: Session, tx_id: int) -> bool:
 
 # ---------- Recibos ----------
 def create_receipt_from_scan(
-    db: Session, scan: dict, image_path: str | None
+    db: Session,
+    scan: dict,
+    image_data: bytes | None = None,
+    image_mime: str | None = None,
 ) -> models.Receipt:
     """Crea un recibo (con sus artículos) y su gasto asociado a partir del escaneo."""
     purchase_date = None
@@ -63,7 +66,8 @@ def create_receipt_from_scan(
         total=scan.get("total", 0.0),
         currency=scan.get("currency", "EUR"),
         category=scan.get("category", "Otros"),
-        image_path=image_path,
+        image_data=image_data,
+        image_mime=image_mime,
     )
     for item in scan.get("items", []):
         receipt.items.append(
