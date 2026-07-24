@@ -1,23 +1,25 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
-env/
+# Dependencias
+/node_modules
 
-# Base de datos y datos locales
-*.db
-*.sqlite3
-data/
-uploads/
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+
+# Producción
+/build
 
 # Variables de entorno
 .env
+.env*.local
 
 # Vercel
 .vercel
 
+# TypeScript
+*.tsbuildinfo
+
 # Sistema
 .DS_Store
 *.log
+npm-debug.log*
