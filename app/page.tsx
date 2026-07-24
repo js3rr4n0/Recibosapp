@@ -22,6 +22,21 @@ function fmt(amount: number, currency: string) {
   }
 }
 
+// Formato compacto para los KPIs: símbolo corto y sin decimales, para que
+// los importes grandes quepan en las tarjetas.
+function fmtCompact(amount: number, currency: string) {
+  try {
+    return new Intl.NumberFormat("es-ES", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+      currencyDisplay: "narrowSymbol",
+    }).format(amount);
+  } catch {
+    return `${Math.round(amount)} ${currency}`;
+  }
+}
+
 // Comprime la foto en el navegador antes de subirla (límite de Vercel + ahorro).
 function compressImage(file: File, maxSize = 1600, quality = 0.8): Promise<Blob> {
   return new Promise((resolve) => {
@@ -49,6 +64,50 @@ function compressImage(file: File, maxSize = 1600, quality = 0.8): Promise<Blob>
     img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
     img.src = url;
   });
+}
+
+// Lanza una lluvia de confeti (celebración al escanear o ahorrar).
+function burstConfetti() {
+  if (typeof document === "undefined") return;
+  const colors = ["#818cf8", "#c084fc", "#f472b6", "#34d399", "#38bdf8", "#fbbf24"];
+  const container = document.createElement("div");
+  container.className = "confetti-container";
+  document.body.appendChild(container);
+  for (let i = 0; i < 90; i++) {
+    const p = document.createElement("i");
+    p.className = "confetti-piece";
+    p.style.left = Math.random() * 100 + "vw";
+    p.style.background = colors[i % colors.length];
+    p.style.animationDelay = Math.random() * 0.35 + "s";
+    p.style.animationDuration = 1.9 + Math.random() * 1.1 + "s";
+    p.style.transform = `rotate(${Math.random() * 360}deg)`;
+    container.appendChild(p);
+  }
+  setTimeout(() => container.remove(), 3200);
+}
+
+// Muestra un importe con animación de conteo ascendente.
+function AnimatedMoney({ value, currency, className, compact }: { value: number; currency: string; className?: string; compact?: boolean }) {
+  const [display, setDisplay] = useState(value);
+  const prev = useRef(value);
+  useEffect(() => {
+    const from = prev.current;
+    const to = value;
+    prev.current = value;
+    if (from === to) { setDisplay(to); return; }
+    const start = performance.now();
+    const dur = 800;
+    let raf = 0;
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / dur, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(from + (to - from) * eased);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <span className={className}>{compact ? fmtCompact(display, currency) : fmt(display, currency)}</span>;
 }
 
 export default function Home() {
@@ -157,6 +216,7 @@ export default function Home() {
         throw new Error(detail);
       }
       const receipt: Receipt = await res.json();
+      burstConfetti();
       setScanStatus({
         kind: "success",
         node: (
@@ -200,6 +260,7 @@ export default function Home() {
     if (!amount || amount <= 0) return showToast("Importe no válido");
     try {
       await api(`/goals/${id}/contribute`, { method: "POST", body: JSON.stringify({ amount }) });
+      burstConfetti();
       showToast("¡Ahorro registrado! 🎉");
       await refreshAll();
     } catch (e) { showToast((e as Error).message); }
@@ -212,22 +273,28 @@ export default function Home() {
 
   return (
     <>
-      <header className="app-header">
-        <h1>💰 Recibosapp</h1>
+      <div className="aurora" aria-hidden="true">
+        <span className="blob b1" />
+        <span className="blob b2" />
+        <span className="blob b3" />
+      </div>
+
+      <header className="app-header reveal">
+        <h1><span className="coin">💰</span> Recibosapp</h1>
         <p className="subtitle">Tu asistente económico personal</p>
       </header>
 
       <main>
         {/* KPIs */}
-        <section className="summary-cards">
-          <div className="card kpi"><span className="kpi-label">Gastos</span><span className="kpi-value expense">{summary ? fmt(summary.total_expenses, cur) : "—"}</span></div>
-          <div className="card kpi"><span className="kpi-label">Ingresos</span><span className="kpi-value income">{summary ? fmt(summary.total_income, cur) : "—"}</span></div>
-          <div className="card kpi"><span className="kpi-label">Ahorro</span><span className="kpi-value saving">{summary ? fmt(summary.total_savings, cur) : "—"}</span></div>
-          <div className="card kpi"><span className="kpi-label">Balance</span><span className={"kpi-value " + (summary && summary.balance >= 0 ? "income" : "expense")}>{summary ? fmt(summary.balance, cur) : "—"}</span></div>
+        <section className="summary-cards reveal" style={{ animationDelay: "0.05s" }}>
+          <div className="card kpi k-exp"><span className="kpi-label">Gastos</span><span className="kpi-value expense">{summary ? <AnimatedMoney value={summary.total_expenses} currency={cur} compact /> : "—"}</span></div>
+          <div className="card kpi k-inc"><span className="kpi-label">Ingresos</span><span className="kpi-value income">{summary ? <AnimatedMoney value={summary.total_income} currency={cur} compact /> : "—"}</span></div>
+          <div className="card kpi k-sav"><span className="kpi-label">Ahorro</span><span className="kpi-value saving">{summary ? <AnimatedMoney value={summary.total_savings} currency={cur} compact /> : "—"}</span></div>
+          <div className="card kpi k-bal"><span className="kpi-label">Balance</span><span className={"kpi-value " + (summary && summary.balance >= 0 ? "income" : "expense")}>{summary ? <AnimatedMoney value={summary.balance} currency={cur} compact /> : "—"}</span></div>
         </section>
 
         {/* Escanear */}
-        <section className="card">
+        <section className="card reveal" style={{ animationDelay: "0.12s" }}>
           <h2>📸 Escanear recibo</h2>
           <p className="muted">Haz una foto de tu ticket y se registrará automáticamente.</p>
           {!config.scanner_enabled && (
@@ -235,15 +302,15 @@ export default function Home() {
               ⚠️ El escaneo automático está desactivado. Añade tu <code>GEMINI_API_KEY</code> en las variables de entorno para activarlo. Mientras tanto, puedes añadir gastos manualmente.
             </div>
           )}
-          <label className="btn btn-primary btn-block file-label">
-            Tomar / subir foto
+          <label className="btn btn-primary btn-block file-label scan-btn">
+            📷 Tomar / subir foto
             <input type="file" accept="image/*" capture="environment" onChange={onScan} />
           </label>
           {scanStatus && <div className={"scan-status " + scanStatus.kind}>{scanStatus.node}</div>}
         </section>
 
         {/* Añadir movimiento */}
-        <section className="card">
+        <section className="card reveal" style={{ animationDelay: "0.19s" }}>
           <h2>➕ Añadir movimiento</h2>
           <form onSubmit={submitTx}>
             <div className="segmented">
@@ -269,7 +336,7 @@ export default function Home() {
         </section>
 
         {/* Por categoría */}
-        <section className="card">
+        <section className="card reveal" style={{ animationDelay: "0.26s" }}>
           <h2>📊 En qué gastas</h2>
           <div className="bars">
             {summary && summary.by_category.length ? summary.by_category.map((c) => (
@@ -282,7 +349,7 @@ export default function Home() {
         </section>
 
         {/* Objetivos */}
-        <section className="card">
+        <section className="card reveal" style={{ animationDelay: "0.33s" }}>
           <div className="card-head"><h2>🏦 Objetivos de ahorro</h2><button className="btn btn-small" onClick={addGoal}>Nuevo</button></div>
           {goals.length ? goals.map((g) => {
             const pct = g.target_amount > 0 ? Math.min((g.current_amount / g.target_amount) * 100, 100) : 0;
@@ -297,14 +364,14 @@ export default function Home() {
         </section>
 
         {/* Movimientos */}
-        <section className="card">
+        <section className="card reveal" style={{ animationDelay: "0.4s" }}>
           <h2>🧾 Movimientos recientes</h2>
           <div className="tx-list">
             {txs.length ? txs.map((t) => (
               <div className="tx-item" key={t.id}>
                 <div className="tx-info">
                   <span className="tx-title">{icons[t.type]} {t.merchant || t.category}</span>
-                  <span className="tx-meta">{t.category} · {t.occurred_on}{t.source === "receipt" ? " · escaneado" : ""}</span>
+                  <span className="tx-meta">{t.category} · {(t.occurred_on || "").slice(0, 10)}{t.source === "receipt" ? " · escaneado" : ""}</span>
                 </div>
                 <div className="tx-right">
                   {t.receipt_id && <button className="tx-receipt-link" title="Ver recibo" onClick={() => openReceipt(t.receipt_id!)}>🧾</button>}
@@ -324,7 +391,7 @@ export default function Home() {
             <button className="modal-close" onClick={() => setModalReceipt(null)}>✕</button>
             <h2>🧾 {modalReceipt.merchant || "Recibo"}</h2>
             <p className="muted">
-              {modalReceipt.address ? modalReceipt.address + " · " : ""}{modalReceipt.purchase_date || ""} · {modalReceipt.category}
+              {modalReceipt.address ? modalReceipt.address + " · " : ""}{(modalReceipt.purchase_date || "").slice(0, 10)} · {modalReceipt.category}
             </p>
             <div className="receipt-items">
               {modalReceipt.items.length ? modalReceipt.items.map((it, i) => (
