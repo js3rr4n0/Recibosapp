@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Recibosapp — Tu asistente económico</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>💰 Recibosapp</h1>
+    <p class="subtitle">Tu asistente económico personal</p>
+  </header>
+
+  <main>
+    <!-- Tarjetas de resumen -->
+    <section class="summary-cards" id="summary-cards">
+      <div class="card kpi">
+        <span class="kpi-label">Gastos</span>
+        <span class="kpi-value expense" id="kpi-expenses">—</span>
+      </div>
+      <div class="card kpi">
+        <span class="kpi-label">Ingresos</span>
+        <span class="kpi-value income" id="kpi-income">—</span>
+      </div>
+      <div class="card kpi">
+        <span class="kpi-label">Ahorro</span>
+        <span class="kpi-value saving" id="kpi-savings">—</span>
+      </div>
+      <div class="card kpi">
+        <span class="kpi-label">Balance</span>
+        <span class="kpi-value" id="kpi-balance">—</span>
+      </div>
+    </section>
+
+    <!-- Escanear recibo -->
+    <section class="card action-card">
+      <h2>📸 Escanear recibo</h2>
+      <p class="muted">Haz una foto de tu ticket y se registrará automáticamente.</p>
+      <div id="scanner-disabled" class="banner warning hidden">
+        ⚠️ El escaneo automático está desactivado. Añade tu <code>ANTHROPIC_API_KEY</code>
+        en el archivo <code>.env</code> para activarlo. Mientras tanto, puedes añadir gastos manualmente.
+      </div>
+      <label class="btn btn-primary btn-block" id="scan-label">
+        <span id="scan-btn-text">Tomar / subir foto</span>
+        <input type="file" id="receipt-input" accept="image/*" capture="environment" hidden />
+      </label>
+      <div id="scan-status" class="scan-status hidden"></div>
+    </section>
+
+    <!-- Añadir movimiento manual -->
+    <section class="card action-card">
+      <h2>➕ Añadir movimiento</h2>
+      <form id="tx-form">
+        <div class="segmented" id="tx-type">
+          <button type="button" class="seg active" data-type="expense">Gasto</button>
+          <button type="button" class="seg" data-type="income">Ingreso</button>
+          <button type="button" class="seg" data-type="saving">Ahorro</button>
+        </div>
+        <div class="form-row">
+          <input type="number" id="tx-amount" step="0.01" min="0" placeholder="Importe" required />
+          <select id="tx-category"></select>
+        </div>
+        <div class="form-row">
+          <input type="text" id="tx-merchant" placeholder="Comercio / concepto" />
+          <input type="date" id="tx-date" />
+        </div>
+        <input type="text" id="tx-note" placeholder="Nota (opcional)" />
+        <button type="submit" class="btn btn-primary btn-block">Guardar</button>
+      </form>
+    </section>
+
+    <!-- Gasto por categoría -->
+    <section class="card">
+      <h2>📊 En qué gastas</h2>
+      <div id="by-category" class="bars"></div>
+    </section>
+
+    <!-- Objetivos de ahorro -->
+    <section class="card">
+      <div class="card-head">
+        <h2>🏦 Objetivos de ahorro</h2>
+        <button class="btn btn-small" id="add-goal-btn">Nuevo</button>
+      </div>
+      <div id="goals-list"></div>
+    </section>
+
+    <!-- Movimientos recientes -->
+    <section class="card">
+      <h2>🧾 Movimientos recientes</h2>
+      <div id="tx-list" class="tx-list"></div>
+    </section>
+  </main>
+
+  <!-- Modal de detalle del recibo -->
+  <div class="modal hidden" id="receipt-modal">
+    <div class="modal-content">
+      <button class="modal-close" id="modal-close">✕</button>
+      <div id="receipt-detail"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

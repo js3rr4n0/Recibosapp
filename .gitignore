@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Base de datos y datos locales
+*.db
+*.sqlite3
+data/
+uploads/
+
+# Variables de entorno
+.env
+
+# Sistema
+.DS_Store
+*.log
