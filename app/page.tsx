@@ -282,6 +282,7 @@ export default function Home() {
       <header className="app-header reveal">
         <h1><span className="coin">💰</span> Recibosapp</h1>
         <p className="subtitle">Tu asistente económico personal</p>
+        <p className="subtitle"><a href="/lista" style={{ color: "var(--primary)" }}>🛒 Lista de compras Walmart SV →</a></p>
       </header>
 
       <main>
